@@ -1,20 +1,35 @@
 package im.cheng.xihe.service.astronomy;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import im.cheng.xihe.model.MoonPhase;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import java.util.*;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
+
+import net.fortuna.ical4j.model.DateTime;
+import net.fortuna.ical4j.model.TimeZoneRegistry;
+import net.fortuna.ical4j.model.TimeZoneRegistryFactory;
+import net.fortuna.ical4j.model.component.VEvent;
+import net.fortuna.ical4j.model.component.VTimeZone;
+import net.fortuna.ical4j.model.Calendar;
+import net.fortuna.ical4j.model.property.*;
+import net.fortuna.ical4j.util.RandomUidGenerator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import static im.cheng.xihe.model.MoonPhase.Moon;
 import static im.cheng.xihe.model.MoonPhase.Phase;
+
+import im.cheng.xihe.model.MoonPhase;
 
 @AllArgsConstructor
 class Event {
@@ -35,23 +50,20 @@ public class MoonService {
 
     MoonService() {
         restTemplate = new RestTemplate();
-
     }
 
     public String fetchData() {
         Date date = new Date();
-        Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT+8"));
+        java.util.Calendar cal = java.util.Calendar.getInstance(TimeZone.getTimeZone("GMT+8"));
         cal.setTime(date);
 
-        int year = cal.get(Calendar.YEAR);
+        int year = cal.get(java.util.Calendar.YEAR);
 
         String result = null;
 
-        String url = new StringBuilder()
-                .append("http://www.hko.gov.hk/tc/gts/astronomy/files/MoonPhases_")
-                .append(year)
-                .append(".xml")
-                .toString();
+        String url = "http://www.hko.gov.hk/tc/gts/astronomy/files/MoonPhases_" +
+                year +
+                ".xml";
 
         try {
             result = restTemplate.getForObject(url, String.class);
@@ -72,14 +84,60 @@ public class MoonService {
             for (Phase phase : phases) {
                 int index = Integer.parseInt(phase.getP());
 
-                String title = new StringBuilder().append(EMOJIES[index]).append(" ").append(PHASES[index]).toString();
-                String time = new StringBuilder().append(phase.getY()).append("-").append(phase.getM()).append("-").append(phase.getD()).append(" ").append(phase.getHm()).toString();
+                String title = EMOJIES[index] + " " + PHASES[index];
+                String time = phase.getY() + "-" + phase.getM() + "-" + phase.getD() + " " + phase.getHm();
 
                 result.add(new Event(title, time));
             }
         }
 
         return result;
+    }
+
+    private String toCalendar(List<Event> events) {
+        Calendar calendar = new Calendar();
+
+        TimeZoneRegistry registry = TimeZoneRegistryFactory.getInstance().createRegistry();
+        VTimeZone tz = registry.getTimeZone("Asia/Shanghai").getVTimeZone();
+
+        calendar.getComponents().add(tz);
+
+        calendar.getProperties().add(new ProdId("-//xihe//月相//CN"));
+        calendar.getProperties().add(Version.VERSION_2_0);
+        calendar.getProperties().add(CalScale.GREGORIAN);
+        calendar.getProperties().add(new XProperty("X-WR-CALNAME", "\uD83C\uDF15月相"));
+
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+
+        for (Event event : events) {
+            Date date = null;
+
+            try {
+                date = format.parse(event.getTime());
+            } catch (ParseException e) {
+                logger.error(e.getMessage());
+            }
+
+            if (date == null) {
+                continue;
+            }
+
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            cal.setTime(date);
+
+            DateTime start = new DateTime(cal.getTime());
+
+            VEvent v = new VEvent(start, start, event.getTitle());
+            v.getProperties().add(tz.getTimeZoneId());
+
+            Uid uid = new RandomUidGenerator().generateUid();
+
+            v.getProperties().add(uid);
+
+            calendar.getComponents().add(v);
+        }
+
+        return calendar.toString();
     }
 
     public String getMoonPhase() {
@@ -106,6 +164,8 @@ public class MoonService {
             return null;
         }
 
-        return "";
+        toCalendar(events);
+
+        return toCalendar(events);
     }
 }
