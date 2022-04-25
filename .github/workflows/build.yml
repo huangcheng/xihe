@@ -1,0 +1,22 @@
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup JDK
+        uses: action/setup-java@v3
+        with:
+          java-version: 17
+          distribution: microsoft
+
+      - name: Install dependencies
+        run: mvn clean install
+      - name: Test
+        run: mvn test
+      - name: Build
+        run: mvn clean package
