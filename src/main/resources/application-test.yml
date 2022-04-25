@@ -3,11 +3,7 @@ spring:
     host: localhost
     port: 6379
     database: 1
-    timeout: 5000
-
-  cache:
-    redis:
-      time-to-live: 43200
+    connection-timeout: 5000
 
 sentry:
   dsn: '' # Sentry DSN
@@ -21,3 +17,4 @@ server:
 
 xihe:
   user-agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36'
+  time-to-live: 43200

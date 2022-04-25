@@ -1,5 +1,6 @@
 package im.cheng.xihe.controller;
 
+import im.cheng.xihe.config.XiheConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -18,15 +19,16 @@ public class MovieController {
 
     private final DoubanService doubanService;
 
-    @Value("${spring.cache.redis.time-to-live}")
-    private long ttl;
+    private final XiheConfiguration xiheConfiguration;
 
     private final String key = "douban";
 
-    MovieController(DoubanService doubanService, RedisTemplate<String, String> redisTemplate) {
+    MovieController(DoubanService doubanService, RedisTemplate<String, String> redisTemplate, XiheConfiguration xiheConfiguration) {
         this.redisTemplate = redisTemplate;
 
         this.doubanService = doubanService;
+
+        this.xiheConfiguration = xiheConfiguration;
     }
 
     @GetMapping(value = "/movie/douban", produces = "text/calendar")
@@ -46,7 +48,7 @@ public class MovieController {
             throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch moon phase from third party service");
         }
 
-        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(ttl));
+        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
 
         return result;
     }

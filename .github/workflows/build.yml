@@ -1,0 +1,29 @@
+name: Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: microsoft
+
+      - name: Setup Redis
+        uses: supercharge/redis-github-action@1.4.0
+        with:
+          redis-version: 6
+
+      - name: Install Dependencies
+        run: mvn clean install
+
+      - name: Test
+        run: mvn test
+
+      - name: Build
+        run: mvn clean package

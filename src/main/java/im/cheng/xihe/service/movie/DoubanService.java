@@ -8,8 +8,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
+import im.cheng.xihe.config.XiheConfiguration;
 import net.fortuna.ical4j.model.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -49,13 +49,14 @@ class Movie {
 public class DoubanService {
     private final RestTemplate restTemplate;
 
-    @Value("${xihe.user-agent}")
-    private String userAgent;
+    private final XiheConfiguration xiheConfiguration;
 
     private final Logger logger = LoggerFactory.getLogger(DoubanService.class);
 
-    public DoubanService() {
+    public DoubanService(XiheConfiguration xiheConfiguration) {
         this.restTemplate = new RestTemplate();
+
+        this.xiheConfiguration = xiheConfiguration;
     }
 
     private String toCalendar(List<Movie> movies) {
@@ -167,7 +168,7 @@ public class DoubanService {
 
     public String getDoubanUpcomingMovies() {
         HttpHeaders headers = new HttpHeaders();
-        headers.add("User-Agent", userAgent);
+        headers.add("User-Agent", xiheConfiguration.getUserAgent());
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
 

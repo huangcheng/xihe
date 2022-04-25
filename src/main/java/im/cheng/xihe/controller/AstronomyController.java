@@ -1,19 +1,16 @@
 package im.cheng.xihe.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
+import java.time.Duration;
+
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpServerErrorException;
 
 
 import im.cheng.xihe.service.astronomy.MoonService;
-import org.springframework.web.client.HttpServerErrorException;
-
-import java.time.Duration;
+import im.cheng.xihe.config.XiheConfiguration;
 
 @RestController
 public class AstronomyController {
@@ -21,15 +18,16 @@ public class AstronomyController {
 
     private final RedisTemplate<String, String> redisTemplate;
 
-    @Value("${spring.cache.redis.time-to-live}")
-    private long ttl;
+    private final XiheConfiguration xiheConfiguration;
 
     private final String key = "moon";
 
-    AstronomyController(MoonService moonService, RedisTemplate<String, String> redisTemplate) {
+    AstronomyController(MoonService moonService, RedisTemplate<String, String> redisTemplate, XiheConfiguration xiheConfiguration) {
         this.moonService = moonService;
 
         this.redisTemplate = redisTemplate;
+
+        this.xiheConfiguration = xiheConfiguration;
     }
 
     @GetMapping(value = "/astronomy/moon", produces = "text/calendar")
@@ -48,7 +46,7 @@ public class AstronomyController {
             throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch moon phase from third party service");
         }
 
-        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(ttl));
+        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
 
         return result;
     }
