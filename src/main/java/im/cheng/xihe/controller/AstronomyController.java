@@ -2,12 +2,11 @@ package im.cheng.xihe.controller;
 
 import java.time.Duration;
 
+import reactor.core.publisher.Mono;
+
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.HttpServerErrorException;
-
 
 import im.cheng.xihe.service.astronomy.MoonService;
 import im.cheng.xihe.config.XiheConfiguration;
@@ -31,23 +30,19 @@ public class AstronomyController {
     }
 
     @GetMapping(value = "/astronomy/moon", produces = "text/calendar")
-    public String moon() throws HttpServerErrorException.InternalServerError {
-        String result;
+    public Mono<String> moon() {
+        String data = redisTemplate.opsForValue().get(key);
 
-        result = redisTemplate.opsForValue().get(key);
+        return Mono.just(data == null ? "" : data).flatMap(value -> {
+            if (value.length() > 0) {
+                return Mono.just(value);
+            } else {
+                return moonService.getMoonPhase().map(result -> {
+                    redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
 
-        if (result != null) {
-            return result;
-        }
-
-        result = moonService.getMoonPhase();
-
-        if (result == null) {
-            throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch moon phase from third party service");
-        }
-
-        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
-
-        return result;
+                    return result;
+                });
+            }
+        });
     }
 }

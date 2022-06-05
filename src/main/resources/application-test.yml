@@ -12,7 +12,7 @@ sentry:
 server:
   error:
     whitelabel:
-      enabled: false
+      enabled: true
   port: 9001
 
 xihe:

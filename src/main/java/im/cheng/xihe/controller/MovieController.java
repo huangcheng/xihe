@@ -1,17 +1,15 @@
 package im.cheng.xihe.controller;
 
-import im.cheng.xihe.config.XiheConfiguration;
-import org.springframework.beans.factory.annotation.Value;
+import java.time.Duration;
+
+import reactor.core.publisher.Mono;
+
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import im.cheng.xihe.config.XiheConfiguration;
 import im.cheng.xihe.service.movie.DoubanService;
-import org.springframework.web.client.HttpServerErrorException;
-
-import java.time.Duration;
 
 @RestController
 public class MovieController {
@@ -32,24 +30,19 @@ public class MovieController {
     }
 
     @GetMapping(value = "/movie/douban", produces = "text/calendar")
-    @ResponseStatus(HttpStatus.OK)
-    public String getUpcomingMoviesFromDouban() {
-        String result;
+    public Mono<String> getUpcomingMoviesFromDouban() {
+        String data = redisTemplate.opsForValue().get(key);
 
-        result = redisTemplate.opsForValue().get(key);
+        return Mono.just(data == null ? "" : data).flatMap(value -> {
+            if (value.length() > 0) {
+                return Mono.just(value);
+            } else {
+                return doubanService.getUpcomingMovies().map(result -> {
+                    redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
 
-        if (result != null) {
-            return result;
-        }
-
-        result = doubanService.getDoubanUpcomingMovies();
-
-        if (result == null) {
-            throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to fetch moon phase from third party service");
-        }
-
-        redisTemplate.opsForValue().set(key, result, Duration.ofSeconds(xiheConfiguration.getTimeToLive()));
-
-        return result;
+                    return result;
+                });
+            }
+        });
     }
 }

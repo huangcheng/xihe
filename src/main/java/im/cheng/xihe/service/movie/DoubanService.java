@@ -10,13 +10,7 @@ import java.util.TimeZone;
 
 import im.cheng.xihe.config.XiheConfiguration;
 import net.fortuna.ical4j.model.*;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +28,8 @@ import net.fortuna.ical4j.model.component.VTimeZone;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 import net.fortuna.ical4j.util.RandomUidGenerator;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Data
 @Getter
@@ -47,16 +43,15 @@ class Movie {
 
 @Service
 public class DoubanService {
-    private final RestTemplate restTemplate;
-
+    private final WebClient client;
     private final XiheConfiguration xiheConfiguration;
 
     private final Logger logger = LoggerFactory.getLogger(DoubanService.class);
 
     public DoubanService(XiheConfiguration xiheConfiguration) {
-        this.restTemplate = new RestTemplate();
-
         this.xiheConfiguration = xiheConfiguration;
+
+        this.client = WebClient.builder().defaultHeaders(httpHeaders -> httpHeaders.add("User-Agent", xiheConfiguration.getUserAgent())).baseUrl("https://movie.douban.com").build();
     }
 
     private String toCalendar(List<Movie> movies) {
@@ -166,27 +161,7 @@ public class DoubanService {
         return movies;
     }
 
-    public String getDoubanUpcomingMovies() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("User-Agent", xiheConfiguration.getUserAgent());
-
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> data = null;
-
-        try {
-            data = restTemplate.exchange("https://movie.douban.com/coming", HttpMethod.GET, entity, String.class);
-        } catch (RestClientException e) {
-            logger.error(e.getMessage());
-        }
-
-        if (data == null) {
-            return null;
-        }
-
-        List<Movie> movies = getMovies(data.toString());
-
-
-        return toCalendar(movies);
+    public Mono<String> getUpcomingMovies() {
+        return this.client.get().uri("/coming").retrieve().bodyToMono(String.class).map(this::getMovies).map(this::toCalendar);
     }
 }

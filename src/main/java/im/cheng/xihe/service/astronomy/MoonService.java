@@ -4,6 +4,7 @@ import java.util.*;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import net.fortuna.ical4j.model.DateTime;
 import net.fortuna.ical4j.model.TimeZoneRegistry;
 import net.fortuna.ical4j.model.TimeZoneRegistryFactory;
@@ -18,7 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
@@ -44,34 +46,23 @@ class Event {
 public class MoonService {
     private final String[] EMOJIES = {"🌑", "🌓", "🌕", "🌗"};
     private final String[] PHASES = {"新（朔）月", "上弦月", "满（望）月", "下弦月"};
-    private final RestTemplate restTemplate;
+
+    private final WebClient client;
     private final Logger logger = LoggerFactory.getLogger(MoonService.class);
 
 
     MoonService() {
-        restTemplate = new RestTemplate();
-    }
-
-    public String fetchData() {
         Date date = new Date();
         java.util.Calendar cal = java.util.Calendar.getInstance(TimeZone.getTimeZone("GMT+8"));
         cal.setTime(date);
 
         int year = cal.get(java.util.Calendar.YEAR);
 
-        String result = null;
-
         String url = "http://www.hko.gov.hk/tc/gts/astronomy/files/MoonPhases_" +
                 year +
                 ".xml";
 
-        try {
-            result = restTemplate.getForObject(url, String.class);
-        } catch (RestClientException e) {
-            logger.error(e.getMessage());
-        }
-
-        return result;
+        client = WebClient.create(url);
     }
 
     public List<Event> getEvents(MoonPhase moonPhase) {
@@ -140,32 +131,15 @@ public class MoonService {
         return calendar.toString();
     }
 
-    public String getMoonPhase() {
-        String data = fetchData();
-
-
+    public Mono<String> getMoonPhase() {
         XmlMapper xmlMapper = new XmlMapper();
 
-        MoonPhase moonPhase = null;
-
-        try {
-            moonPhase = xmlMapper.readValue(data, MoonPhase.class);
-        } catch (JsonProcessingException e) {
-            logger.error(e.getMessage());
-        }
-
-        if (moonPhase == null) {
-            return null;
-        }
-
-        List<Event> events = getEvents(moonPhase);
-
-        if (events.size() == 0) {
-            return null;
-        }
-
-        toCalendar(events);
-
-        return toCalendar(events);
+        return client.get().retrieve().bodyToMono(String.class).map(data -> {
+            try {
+                return xmlMapper.readValue(data, MoonPhase.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        }).map(this::getEvents).map(this::toCalendar);
     }
 }
